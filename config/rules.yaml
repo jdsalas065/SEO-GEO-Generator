@@ -1,0 +1,38 @@
+llm:
+  provider: anthropic          # anthropic | openai | gemini
+  model: claude-3-5-sonnet-20241022
+  temperature: 0.7
+  max_tokens: 4096
+  api_key_env: ANTHROPIC_API_KEY   # env var name holding the key
+
+seo:
+  min_word_count: 800
+  max_word_count: 1500
+  tone: informative              # informative | conversational | authoritative
+  language: vi                   # Vietnamese
+  required_headings:
+    - h2: at_least_2
+    - h3: at_least_3
+  meta_description_max_length: 160
+  keyword_density_min: 0.01      # 1%
+  keyword_density_max: 0.03      # 3%
+
+geo:
+  target_country: VN
+  locale: vi-VN
+  local_entities: true           # include local business / place names when relevant
+  currency: VND
+  date_format: dd/MM/yyyy
+
+content:
+  include_faq: true
+  faq_count: 5
+  include_sources: false
+  markdown_output: true
+
+validation:
+  min_word_count: 600            # hard minimum before rejecting
+  required_sections:
+    - title
+    - introduction
+    - conclusion
