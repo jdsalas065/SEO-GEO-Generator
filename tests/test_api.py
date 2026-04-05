@@ -125,6 +125,172 @@ async def test_get_job(client: AsyncClient, mocker, db_session):
     assert resp2.json()["id"] == job_id
 
 
+@pytest.mark.asyncio
+async def test_get_jobs(client: AsyncClient, mocker):
+    mocker.patch("app.routers.jobs.generate_article.delay")
+
+    payload_1 = [{"topic": "Job one"}]
+    payload_2 = [{"topic": "Job two"}]
+
+    await client.post(
+        "/jobs",
+        files={"file": ("j1.json", io.BytesIO(make_json_bytes(payload_1)), "application/json")},
+    )
+    await client.post(
+        "/jobs",
+        files={"file": ("j2.json", io.BytesIO(make_json_bytes(payload_2)), "application/json")},
+    )
+
+    resp = await client.get("/jobs")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) >= 2
+    assert "timeout_count" in data[0]
+    assert "percent" in data[0]
+
+
+@pytest.mark.asyncio
+async def test_get_jobs_includes_timeout_count(client: AsyncClient, db_session):
+    job = Job(source_filename="timeouts.json", status=JobStatus.running, total=2, done=0, failed=1)
+    db_session.add(job)
+    await db_session.flush()
+
+    timed_out_article = Article(
+        job_id=job.id,
+        topic="Slow article",
+        status=ArticleStatus.rejected,
+        review_note="Task timeout after 900s (soft limit reached)",
+    )
+    normal_failed_article = Article(
+        job_id=job.id,
+        topic="Validation failed",
+        status=ArticleStatus.rejected,
+        review_note="Content validation failed",
+    )
+    db_session.add_all([timed_out_article, normal_failed_article])
+    await db_session.commit()
+
+    resp = await client.get("/jobs")
+    assert resp.status_code == 200
+    data = resp.json()
+    target = next(item for item in data if item["id"] == str(job.id))
+
+    assert target["timeout_count"] == 1
+    assert target["percent"] == 50
+
+
+@pytest.mark.asyncio
+async def test_reworker_by_worker_ids(client: AsyncClient, mocker, db_session):
+    delay_mock = mocker.patch("app.routers.jobs.generate_article.delay")
+
+    job = Job(source_filename="timeouts.json", status=JobStatus.failed, total=2, done=0, failed=2)
+    db_session.add(job)
+    await db_session.flush()
+
+    timeout_article = Article(
+        job_id=job.id,
+        topic="Timeout topic",
+        keyword="kw",
+        status=ArticleStatus.rejected,
+        review_note="Task timeout after 900s (soft limit reached)",
+        celery_task_id="worker-timeout-1",
+    )
+    non_timeout_article = Article(
+        job_id=job.id,
+        topic="Other rejected",
+        status=ArticleStatus.rejected,
+        review_note="Content validation failed",
+        celery_task_id="worker-not-timeout",
+    )
+    db_session.add_all([timeout_article, non_timeout_article])
+    await db_session.commit()
+
+    resp = await client.post(
+        f"/jobs/{job.id}/reworker/by-worker-ids",
+        json={
+            "worker_ids": ["worker-timeout-1", "worker-not-timeout", "worker-missing"],
+            "review_note": "Retry after timeout",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["requested"] == 3
+    assert data["requeued"] == 1
+    assert data["skipped"] == 2
+
+    actions = {item["worker_id"]: item["action"] for item in data["results"]}
+    assert actions["worker-timeout-1"] == "requeued"
+    assert actions["worker-not-timeout"] == "skipped_not_timeout"
+    assert actions["worker-missing"] == "skipped_not_found"
+
+    assert delay_mock.call_count == 1
+
+    await db_session.refresh(timeout_article)
+    await db_session.refresh(job)
+    assert timeout_article.status == ArticleStatus.queued
+    assert job.failed == 1
+    assert job.status == JobStatus.running
+
+
+@pytest.mark.asyncio
+async def test_reworker_by_job_id(client: AsyncClient, mocker, db_session):
+    delay_mock = mocker.patch("app.routers.jobs.generate_article.delay")
+
+    job = Job(source_filename="timeouts.json", status=JobStatus.failed, total=3, done=0, failed=2)
+    db_session.add(job)
+    await db_session.flush()
+
+    timeout_article_1 = Article(
+        job_id=job.id,
+        topic="Timeout topic 1",
+        status=ArticleStatus.rejected,
+        review_note="Task timeout after 900s (soft limit reached)",
+        celery_task_id="worker-timeout-1",
+    )
+    timeout_article_2 = Article(
+        job_id=job.id,
+        topic="Timeout topic 2",
+        status=ArticleStatus.rejected,
+        review_note="Task timeout after 900s (soft limit reached)",
+        celery_task_id="worker-timeout-2",
+    )
+    non_timeout_article = Article(
+        job_id=job.id,
+        topic="Normal reject",
+        status=ArticleStatus.rejected,
+        review_note="Content validation failed",
+        celery_task_id="worker-not-timeout",
+    )
+    db_session.add_all([timeout_article_1, timeout_article_2, non_timeout_article])
+    await db_session.commit()
+
+    resp = await client.post(
+        f"/jobs/{job.id}/reworker",
+        json={"review_note": "Retry timed-out only", "limit": 1},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["requested"] == 1
+    assert data["requeued"] == 1
+    assert data["skipped"] == 0
+    assert delay_mock.call_count == 1
+
+    await db_session.refresh(timeout_article_1)
+    await db_session.refresh(timeout_article_2)
+    await db_session.refresh(non_timeout_article)
+    await db_session.refresh(job)
+
+    requeued_statuses = [timeout_article_1.status, timeout_article_2.status]
+    assert requeued_statuses.count(ArticleStatus.queued) == 1
+    assert requeued_statuses.count(ArticleStatus.rejected) == 1
+    assert non_timeout_article.status == ArticleStatus.rejected
+    assert job.failed == 1
+    assert job.status == JobStatus.running
+
+
 # ---------------------------------------------------------------------------
 # Articles
 # ---------------------------------------------------------------------------
@@ -278,6 +444,7 @@ async def test_export_no_approved(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_export_returns_zip(client: AsyncClient, db_session):
     from app.models import Article, ArticleStatus, Job, JobStatus
+    from slugify import slugify
 
     job = Job(source_filename="test.json", status=JobStatus.done, total=1, done=1)
     db_session.add(job)
@@ -296,11 +463,13 @@ async def test_export_returns_zip(client: AsyncClient, db_session):
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "application/zip"
 
-    # Verify ZIP contains the article
+    # Verify ZIP contains the article with slugified topic name
     buf = io.BytesIO(resp.content)
     with zipfile.ZipFile(buf) as zf:
         names = zf.namelist()
         assert len(names) == 1
-        assert names[0] == f"{article.id}.md"
+        # Filename should be slugified topic + .md
+        expected_filename = slugify(article.topic, allow_unicode=False)[:80] + ".md"
+        assert names[0] == expected_filename
         content = zf.read(names[0]).decode("utf-8")
         assert "# Export" in content

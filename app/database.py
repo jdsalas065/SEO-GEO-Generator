@@ -44,6 +44,13 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+def reset_engine_and_session_factory() -> None:
+    """Clear module-level DB singletons (used by worker process init)."""
+    global _engine, _session_factory
+    _session_factory = None
+    _engine = None
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI dependency that yields an async DB session."""
     async with get_session_factory()() as session:

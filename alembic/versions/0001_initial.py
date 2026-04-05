@@ -21,21 +21,37 @@ depends_on = None
 
 def upgrade() -> None:
     # --- Enums ---
-    job_status = postgresql.ENUM(
-        "pending", "running", "done", "failed", name="job_status", create_type=False
+    # Asyncpg can still raise duplicate type errors in some checkfirst flows,
+    # so create enums with an explicit duplicate-object guard.
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE job_status AS ENUM ('pending', 'running', 'done', 'failed');
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END
+        $$;
+        """
     )
-    job_status.create(op.get_bind(), checkfirst=True)
 
-    article_status = postgresql.ENUM(
-        "queued",
-        "generating",
-        "pending_review",
-        "approved",
-        "rejected",
-        name="article_status",
-        create_type=False,
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE article_status AS ENUM (
+                'queued',
+                'generating',
+                'pending_review',
+                'approved',
+                'rejected'
+            );
+        EXCEPTION
+            WHEN duplicate_object THEN NULL;
+        END
+        $$;
+        """
     )
-    article_status.create(op.get_bind(), checkfirst=True)
 
     # --- jobs ---
     op.create_table(
@@ -48,7 +64,14 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            sa.Enum("pending", "running", "done", "failed", name="job_status"),
+            postgresql.ENUM(
+                "pending",
+                "running",
+                "done",
+                "failed",
+                name="job_status",
+                create_type=False,
+            ),
             nullable=False,
             server_default="pending",
         ),
@@ -89,13 +112,14 @@ def upgrade() -> None:
         sa.Column("keyword", sa.String(255), nullable=True),
         sa.Column(
             "status",
-            sa.Enum(
+            postgresql.ENUM(
                 "queued",
                 "generating",
                 "pending_review",
                 "approved",
                 "rejected",
                 name="article_status",
+                create_type=False,
             ),
             nullable=False,
             server_default="queued",

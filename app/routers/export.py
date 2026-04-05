@@ -8,6 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from slugify import slugify
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -25,6 +26,8 @@ async def export_articles(
     """
     Stream a ZIP archive of all approved articles as .md files.
     Optionally filter by job_id.
+    
+    File naming: slugified topic (up to 80 chars) + .md
     """
     stmt = select(Article).where(Article.status == ArticleStatus.approved)
     if job_id is not None:
@@ -40,8 +43,13 @@ async def export_articles(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         for article in articles:
-            filename = f"{article.id}.md"
-            content = article.content or ""
+            # Use md_content if available (with frontmatter), fall back to content
+            content = article.md_content or article.content or ""
+            
+            # Slugify topic: Vietnamese → ASCII, max 80 chars, add .md extension
+            topic_slug = slugify(article.topic, allow_unicode=False)[:80]
+            filename = f"{topic_slug}.md"
+            
             zf.writestr(filename, content.encode("utf-8"))
 
     buf.seek(0)

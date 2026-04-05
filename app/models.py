@@ -68,7 +68,10 @@ class Article(Base):
         nullable=False,
         default=ArticleStatus.queued,
     )
+    current_step: Mapped[str | None] = mapped_column(String(50), nullable=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    md_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    seo_score: Mapped[float | None] = mapped_column(nullable=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
