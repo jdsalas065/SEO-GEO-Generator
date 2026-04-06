@@ -6,9 +6,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.llm_client import LLMClient, LLMJsonParseError
+from app.llm_client import LLMClient, LLMJsonParseError, _extract_json_candidate
 from app.prompt_builder import (
     build_outline_prompt,
+    build_fallback_outline,
     build_write_prompt,
     build_seo_check_prompt,
 )
@@ -61,6 +62,54 @@ class TestLLMClientJsonParsing:
         client = LLMClient(config)
         
         with patch.object(client, "generate", return_value="Not valid JSON {{{"):
+            with pytest.raises(LLMJsonParseError):
+                client.generate_json({}, max_retries=0)
+
+    def test_extract_json_candidate_from_wrapped_text(self) -> None:
+        """Should extract a clean JSON object from wrapped prose and fences."""
+        response = (
+            "Here is your result:\n"
+            "```json\n"
+            "{\"h1\": \"Title\", \"sections\": []}\n"
+            "```\n"
+            "Thanks"
+        )
+        extracted = _extract_json_candidate(response)
+        assert extracted == '{"h1": "Title", "sections": []}'
+
+    def test_extract_json_candidate_balanced_object(self) -> None:
+        """Should return only the first balanced object when trailing text exists."""
+        response = '{"a": {"b": 1}} trailing text'
+        extracted = _extract_json_candidate(response)
+        assert extracted == '{"a": {"b": 1}}'
+
+    def test_generate_json_repair_fallback_success(self) -> None:
+        """Should repair malformed JSON after retries are exhausted."""
+        config = {
+            "provider": "anthropic",
+            "model": "claude-haiku-4-5-20251001",
+            "temperature": 0.3,
+            "max_tokens": 800,
+        }
+        client = LLMClient(config)
+
+        bad = "```json\n{\"h1\": \"Title\", \"sections\": [\"x\"\n```"
+        repaired = '{"h1": "Title", "sections": ["x"]}'
+        with patch.object(client, "generate", side_effect=[bad, repaired]):
+            result = client.generate_json({}, max_retries=0)
+            assert result == {"h1": "Title", "sections": ["x"]}
+
+    def test_generate_json_repair_fallback_failure(self) -> None:
+        """Should raise LLMJsonParseError when repair fallback also fails."""
+        config = {
+            "provider": "anthropic",
+            "model": "claude-haiku-4-5-20251001",
+            "temperature": 0.3,
+            "max_tokens": 800,
+        }
+        client = LLMClient(config)
+
+        with patch.object(client, "generate", side_effect=["bad {{{", "still bad {{{"]):
             with pytest.raises(LLMJsonParseError):
                 client.generate_json({}, max_retries=0)
 
@@ -117,6 +166,29 @@ class TestPromptBuilders:
         prompt = build_outline_prompt(topic, review_note=review_note)
         
         assert review_note in prompt["user"]
+
+    def test_build_fallback_outline(self) -> None:
+        """Fallback outline must always return minimal valid structure."""
+        outline = build_fallback_outline("May loc khong khi")
+        assert "h1" in outline
+        assert isinstance(outline.get("sections"), list)
+        assert len(outline["sections"]) >= 2
+        assert isinstance(outline.get("keywords"), list)
+        assert isinstance(outline.get("faq"), list)
+
+    def test_build_fallback_outline_respects_include_faq_false(self) -> None:
+        """Fallback outline should return no FAQ when include_faq is disabled."""
+        cfg = {"content": {"include_faq": False, "faq_count": 5}}
+        outline = build_fallback_outline("Chu de bat ky", config=cfg)
+        assert outline["faq"] == []
+
+    def test_build_fallback_outline_faq_is_topic_aware(self) -> None:
+        """Fallback FAQ should reference the given topic instead of fixed domain text."""
+        cfg = {"content": {"include_faq": True, "faq_count": 2}}
+        topic = "Top quan ca phe dep o Da Nang"
+        outline = build_fallback_outline(topic, config=cfg)
+        assert len(outline["faq"]) == 2
+        assert topic in outline["faq"][0]["q"]
 
     def test_build_write_prompt(self) -> None:
         """Test write prompt structure."""

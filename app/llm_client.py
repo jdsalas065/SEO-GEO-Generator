@@ -82,6 +82,67 @@ _PROVIDERS = {
 }
 
 
+def _extract_json_candidate(response: str) -> str:
+    """Extract the most likely JSON object from an LLM response."""
+    text = response.strip()
+
+    # Prefer fenced JSON blocks when present.
+    fenced = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", text, re.IGNORECASE)
+    if fenced:
+        return fenced.group(1).strip()
+
+    # Remove a single pair of surrounding code fences if any.
+    text = re.sub(r"^```(?:json)?\n?", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\n?```$", "", text)
+    text = text.strip()
+
+    # Extract the first balanced JSON object while respecting quoted strings.
+    start = text.find("{")
+    if start == -1:
+        return text
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for idx, ch in enumerate(text[start:], start=start):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : idx + 1].strip()
+
+    # Fallback: keep the original string for error reporting/retry.
+    return text
+
+
+def _build_json_repair_prompt(raw_response: str) -> str:
+    """Build a strict repair prompt to recover valid JSON from malformed output."""
+    return (
+        "You are a JSON repair tool.\n"
+        "Convert the malformed content below into ONE valid JSON object.\n"
+        "Rules:\n"
+        "- Return ONLY JSON object\n"
+        "- No markdown fences\n"
+        "- No explanations\n"
+        "- Keep keys and structure as close as possible\n"
+        "- If content is truncated, complete minimally to valid JSON\n\n"
+        "Malformed content:\n"
+        f"{raw_response[:6000]}"
+    )
+
+
 class LLMJsonParseError(Exception):
     """Raised when LLM response cannot be parsed as JSON."""
     pass
@@ -135,34 +196,47 @@ class LLMClient:
             LLMJsonParseError: If JSON parsing fails after retries
         """
         prompt_to_send: str | dict[str, Any] = prompt
+        last_response = ""
+        last_error: json.JSONDecodeError | None = None
         for attempt in range(max_retries + 1):
             response = self.generate(prompt_to_send)
-            
-            # Try to extract JSON from response (handle markdown code fences)
-            json_str = response.strip()
-            
-            # Remove markdown code fences if present
-            json_str = re.sub(r"^```(?:json)?\n?", "", json_str)
-            json_str = re.sub(r"\n?```$", "", json_str)
-            json_str = json_str.strip()
+            last_response = response
+            json_str = _extract_json_candidate(response)
             
             try:
                 return json.loads(json_str)
             except json.JSONDecodeError as e:
+                last_error = e
                 if attempt < max_retries:
                     # Retry with JSON hint
                     if isinstance(prompt_to_send, dict):
                         prompt_for_retry = dict(prompt_to_send)
-                        prompt_for_retry["user"] = prompt_for_retry.get("user", "") + "\n\nPlease respond with ONLY valid JSON, no markdown formatting."
+                        prompt_for_retry["user"] = (
+                            prompt_for_retry.get("user", "")
+                            + "\n\nCRITICAL: Respond with ONLY one valid JSON object."
+                            + " No markdown, no explanation, no trailing text."
+                        )
                     else:
-                        prompt_for_retry = prompt_to_send + "\n\nPlease respond with ONLY valid JSON, no markdown formatting."
+                        prompt_for_retry = (
+                            prompt_to_send
+                            + "\n\nCRITICAL: Respond with ONLY one valid JSON object."
+                            + " No markdown, no explanation, no trailing text."
+                        )
                     prompt_to_send = prompt_for_retry
                     continue
-                else:
-                    raise LLMJsonParseError(
-                        f"Failed to parse JSON response after {max_retries + 1} attempts. "
-                        f"Last error: {e}\nResponse: {response[:200]}"
-                    )
+
+        # Final fallback: ask the same model to repair malformed JSON.
+        repair_prompt = _build_json_repair_prompt(last_response)
+        repaired_response = self.generate(repair_prompt)
+        repaired_json = _extract_json_candidate(repaired_response)
+        try:
+            return json.loads(repaired_json)
+        except json.JSONDecodeError:
+            err_text = str(last_error) if last_error is not None else "unknown JSON parse error"
+            raise LLMJsonParseError(
+                f"Failed to parse JSON response after {max_retries + 1} attempts and repair fallback. "
+                f"Last error: {err_text}\nResponse: {last_response[:200]}"
+            )
 
 
 def call_llm(prompt: str, config_override: dict[str, Any] | None = None) -> str:

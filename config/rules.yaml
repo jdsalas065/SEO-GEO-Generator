@@ -1,32 +1,32 @@
 llm:
-  provider: anthropic          # anthropic | openai | gemini (default provider)
-  model: claude-3-7-sonnet-20250219
+  provider: anthropic
+  model: claude-sonnet-4-6                        # alias luôn trỏ đến Sonnet mới nhất
   temperature: 0.7
   max_tokens: 4096
-  api_key_env: ANTHROPIC_API_KEY   # env var name holding the key
+  api_key_env: ANTHROPIC_API_KEY
 
-  # Multi-step pipeline: 3 LLM calls for better quality and cost control
   steps:
     outline:
       provider: "anthropic"
-      model: "claude-3-5-haiku-20241022"
-      max_tokens: 800
+      model: "claude-haiku-4-5-20251001"          # ✅ thay thế haiku cũ
+      max_tokens: 1400
       temperature: 0.3
       api_key_env: ANTHROPIC_API_KEY
 
     write:
       provider: "anthropic"
-      model: "claude-3-7-sonnet-20250219"
+      model: "claude-sonnet-4-6"                  # hoặc claude-sonnet-4-5-20250929
       max_tokens: 4096
       temperature: 0.7
       api_key_env: ANTHROPIC_API_KEY
 
     seo_check:
       provider: "anthropic"
-      model: "claude-3-5-haiku-20241022"
+      model: "claude-haiku-4-5-20251001"          # ✅ thay thế haiku cũ
       max_tokens: 600
       temperature: 0.2
       api_key_env: ANTHROPIC_API_KEY
+
 
 seo:
   min_word_count: 800

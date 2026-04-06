@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -71,9 +72,10 @@ Requirements:
 - Language: {language} ({locale})
 - Target country: {country}
 - Tone: {tone}
-- Include at least 2 main sections (H2)
+- Use exactly 2 main sections (H2)
 - Each section should have 1-2 subsections (H3)
-- Include 3-5 key points per section
+- Include exactly 2 short key points per section
+- Keep each string concise (max 80 chars)
 {faq_instruction}
 
 Return this JSON structure (NO markdown code fences):
@@ -83,7 +85,7 @@ Return this JSON structure (NO markdown code fences):
     {{
       "h2": "Section heading",
       "h3s": ["Subsection 1", "Subsection 2"],
-      "key_points": ["Point 1", "Point 2", "Point 3"]
+            "key_points": ["Point 1", "Point 2"]
     }}
   ],
   "keywords": ["keyword1", "keyword2", "keyword3"],
@@ -94,6 +96,94 @@ Return this JSON structure (NO markdown code fences):
 }}"""
     
     return {"system": system_prompt, "user": user_prompt}
+
+
+def build_fallback_outline(topic: str, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return a deterministic outline when LLM JSON cannot be parsed."""
+    if config is None:
+        config = load_rules()
+
+    content_cfg = config.get("content", {})
+    include_faq = bool(content_cfg.get("include_faq", True))
+    faq_count = int(content_cfg.get("faq_count", 5))
+
+    words = re.findall(r"\w+", topic.lower(), flags=re.UNICODE)
+    keywords: list[str] = []
+    for w in words:
+        if len(w) < 3:
+            continue
+        if w not in keywords:
+            keywords.append(w)
+        if len(keywords) == 5:
+            break
+
+    if not keywords:
+        keywords = ["huong dan", "kinh nghiem", "gia dinh"]
+
+    def _build_faq_item(index: int, topic_text: str) -> dict[str, str]:
+        topic_terms = topic_text.split()
+        lead_term = topic_terms[0] if topic_terms else "chu de nay"
+        templates = [
+            (
+                f"{topic_text} phu hop voi doi tuong nao?",
+                "Phu hop voi nguoi moi bat dau va nguoi can giai phap thuc te.",
+            ),
+            (
+                f"Nen uu tien tieu chi nao khi chon {topic_text}?",
+                "Nen uu tien muc tieu su dung, ngan sach va kha nang van hanh lau dai.",
+            ),
+            (
+                f"{topic_text} thuong gap nhung loi nao?",
+                "Thuong gap viec chon sai nhu cau thuc te va bo qua buoc danh gia ket qua.",
+            ),
+            (
+                f"Bao lau nen danh gia lai hieu qua cua {topic_text}?",
+                "Nen danh gia dinh ky sau moi giai doan su dung de dieu chinh kip thoi.",
+            ),
+            (
+                f"Lam sao de toi uu chi phi khi ap dung {topic_text}?",
+                "Bat dau voi phuong an can bang chi phi-hieu qua, sau do toi uu theo du lieu thuc te.",
+            ),
+            (
+                f"Can theo doi chi so nao de do hieu qua cua {topic_text}?",
+                "Theo doi ket qua dau ra, muc do on dinh va chi phi van hanh theo thoi gian.",
+            ),
+            (
+                f"Khi nao nen chuyen sang phuong an khac cho {lead_term}?",
+                "Khi chi phi vuot muc, hieu qua giam hoac nhu cau da thay doi ro rang.",
+            ),
+        ]
+        question, answer = templates[index % len(templates)]
+        return {"q": question, "a": answer}
+
+    faq: list[dict[str, str]] = []
+    if include_faq:
+        topic_short = topic.strip() or "chu de nay"
+        faq = [_build_faq_item(i, topic_short) for i in range(max(0, faq_count))]
+
+    return {
+        "h1": topic.strip()[:120] or "Huong dan thuc te",
+        "sections": [
+            {
+                "h2": "Nhu cau su dung va muc tieu uu tien",
+                "h3s": ["Xac dinh boi canh su dung", "Dat muc tieu cu the"],
+                "key_points": [
+                    "Danh gia nhu cau theo tinh huong thuc te.",
+                    "Can bang giua hieu qua, chi phi va do ben.",
+                ],
+            },
+            {
+                "h2": "Cach chon giai phap phu hop va toi uu",
+                "h3s": ["So sanh cac lua chon", "Kiem tra va toi uu van hanh"],
+                "key_points": [
+                    "So sanh theo tieu chi ro rang va co uu tien.",
+                    "Theo doi ket qua de dieu chinh kip thoi.",
+                ],
+            },
+        ],
+        "keywords": keywords,
+        "faq": faq,
+    }
 
 
 def build_write_prompt(

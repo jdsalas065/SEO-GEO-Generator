@@ -24,6 +24,7 @@ from app.post_processor import (
 from app.prompt_builder import (
     build_prompt,
     build_outline_prompt,
+    build_fallback_outline,
     build_write_prompt,
     build_seo_check_prompt,
     load_rules as load_prompt_rules,
@@ -185,19 +186,14 @@ def generate_article(
         outline_prompt = build_outline_prompt(topic, config, review_note or "")
         
         try:
-            outline = outline_client.generate_json(outline_prompt)
+            outline = outline_client.generate_json(outline_prompt, max_retries=2)
         except LLMJsonParseError as e:
-            logger.error("Article %s: Outline JSON parse failed: %s", article_id, e)
-            _run_async(
-                _update_article_status(
-                    article_id,
-                    status=ArticleStatus.rejected,
-                    review_note=f"Failed to generate outline: {str(e)[:200]}",
-                    current_step=None,
-                )
+            logger.warning(
+                "Article %s: Outline JSON parse failed (%s). Falling back to deterministic outline.",
+                article_id,
+                e,
             )
-            _run_async(_increment_job_counter(job_id, "failed"))
-            return {"status": "rejected", "error": "outline_parse_failed"}
+            outline = build_fallback_outline(topic, config)
 
         logger.info("Article %s: Step 1 (outline) completed", article_id)
 
