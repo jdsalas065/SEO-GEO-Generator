@@ -429,6 +429,72 @@ async def test_review_article_wrong_status(client: AsyncClient, db_session):
     assert resp.status_code == 400
 
 
+@pytest.mark.asyncio
+async def test_retry_article_rejected(client: AsyncClient, mocker, db_session):
+    delay_mock = mocker.patch("app.routers.articles.generate_article.delay")
+
+    from app.models import Article, ArticleStatus, Job, JobStatus
+
+    job = Job(source_filename="retry.json", status=JobStatus.done, total=1, done=0, failed=1)
+    db_session.add(job)
+    await db_session.flush()
+
+    article = Article(
+        job_id=job.id,
+        topic="Retry me",
+        keyword="retry",
+        status=ArticleStatus.rejected,
+        review_note="Content validation failed",
+        celery_task_id="old-worker-id",
+    )
+    db_session.add(article)
+    await db_session.commit()
+
+    resp = await client.post(
+        f"/articles/{article.id}/retry",
+        json={"note": "Please improve structure and examples"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "queued"
+    assert data["review_note"] == "Please improve structure and examples"
+
+    await db_session.refresh(article)
+    await db_session.refresh(job)
+    assert article.status == ArticleStatus.queued
+    assert article.celery_task_id is None
+    assert job.failed == 0
+    assert job.status == JobStatus.running
+
+    delay_mock.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_retry_article_not_found(client: AsyncClient):
+    resp = await client.post(f"/articles/{uuid.uuid4()}/retry", json={})
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_retry_article_wrong_status(client: AsyncClient, db_session):
+    from app.models import Article, ArticleStatus, Job, JobStatus
+
+    job = Job(source_filename="retry.json", status=JobStatus.running, total=1, done=0, failed=0)
+    db_session.add(job)
+    await db_session.flush()
+
+    article = Article(
+        job_id=job.id,
+        topic="Already queued",
+        status=ArticleStatus.queued,
+    )
+    db_session.add(article)
+    await db_session.commit()
+
+    resp = await client.post(f"/articles/{article.id}/retry", json={})
+    assert resp.status_code == 400
+
+
 # ---------------------------------------------------------------------------
 # Export
 # ---------------------------------------------------------------------------
