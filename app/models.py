@@ -4,9 +4,10 @@ from __future__ import annotations
 import enum
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import JSON, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -71,6 +72,10 @@ class Article(Base):
     current_step: Mapped[str | None] = mapped_column(String(50), nullable=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     md_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    images_json: Mapped[list[dict[str, Any]] | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=True,
+    )
     seo_score: Mapped[float | None] = mapped_column(nullable=True)
     review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
