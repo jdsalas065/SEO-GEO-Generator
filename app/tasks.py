@@ -12,6 +12,7 @@ from celery.exceptions import SoftTimeLimitExceeded, TimeLimitExceeded
 from celery.signals import worker_process_init, worker_process_shutdown
 
 from app.llm_client import call_llm, LLMClient, LLMJsonParseError
+from app.image_search import attach_images
 from app.post_processor import (
     count_words,
     save_markdown,
@@ -287,6 +288,14 @@ def generate_article(
             llm_provider=llm_provider,
         )
 
+        # Auto-attach images to selected H2 sections without failing the article pipeline.
+        md_content, images_json = attach_images(
+            md_content=md_content,
+            topic=topic,
+            keyword=keyword,
+            article_id=article_id,
+        )
+
         # Save to disk
         md_path = ARTICLES_DIR / job_id / f"{article_id}.md"
         save_markdown(md_content, md_path)
@@ -298,6 +307,7 @@ def generate_article(
                 status=ArticleStatus.pending_review,
                 content=clean_content,
                 md_content=md_content,
+                images_json=images_json,
                 word_count=wc,
                 seo_score=geo_score,
                 current_step=None,

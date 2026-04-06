@@ -147,3 +147,10 @@ class ArticleOut(BaseModel):
 class ReviewRequest(BaseModel):
     action: Literal["approve", "reject"]
     note: Optional[str] = Field(None, description="Required when action=reject")
+
+
+class RetryRequest(BaseModel):
+    note: Optional[str] = Field(
+        None,
+        description="Optional note passed into the next generation attempt",
+    )
