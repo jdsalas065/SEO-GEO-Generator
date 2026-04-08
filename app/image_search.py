@@ -268,10 +268,15 @@ def attach_images(
 
     base = keyword.strip() if keyword and keyword.strip() else topic.strip()
     keyword_tokens = tokenize_keywords(base)
-    if not keyword_tokens:
-        return md_content, []
+    if keyword_tokens:
+        selected = select_h2s_for_images(h2s, keyword_tokens, IMAGE_MAX_PER_ARTICLE)
+    else:
+        selected = []
 
-    selected = select_h2s_for_images(h2s, keyword_tokens, IMAGE_MAX_PER_ARTICLE)
+    if not selected:
+        # Fallback: if no keyword-scored H2 matches, use the first H2 headings by order.
+        selected = h2s[:IMAGE_MAX_PER_ARTICLE]
+
     if not selected:
         return md_content, []
 

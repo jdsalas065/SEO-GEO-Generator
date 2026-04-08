@@ -242,6 +242,8 @@ Format:
 - Write introduction (2-3 sentences) that directly answers the main question
 - Follow sections in exact order from the structure above
 - Use H2 (##) for main sections and H3 (###) for subsections
+- Include a final H2 conclusion section before the FAQ, titled exactly '## Kết luận'
+- Do not omit the conclusion section; the article must end with a short closing summary
 - End with FAQ section (## FAQ)
 - Include a meta description as HTML comment at the top: <!-- meta: concise description (max 160 chars) -->
 

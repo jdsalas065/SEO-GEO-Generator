@@ -113,7 +113,7 @@ def validate_content(content: str, rules: dict[str, Any] | None = None) -> list[
                     errors.append("Introduction section appears missing or too short")
 
     if "conclusion" in required:
-        if not re.search(r"(?:conclusion|kết luận|tổng kết|kết)", lower_content):
+        if not re.search(r"(?:conclusion|kết luận|tổng kết|kết bài|tóm lại|lời kết)", lower_content):
             errors.append("Conclusion section appears missing")
 
     # H2 headings

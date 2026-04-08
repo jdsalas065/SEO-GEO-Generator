@@ -153,33 +153,43 @@ class TestPostProcessResult:
 
 @pytest.mark.asyncio
 async def test_export_zip_with_slugified_names() -> None:
-    """Test that ZIP export uses slugified filenames."""
-    from unittest.mock import patch, MagicMock, AsyncMock
+    """Test that ZIP export uses slugified folder names and local assets."""
+    from unittest.mock import MagicMock, AsyncMock, patch
+    import uuid
     from app.routers.export import export_articles
+
+    article_id = uuid.uuid4()
 
     # Create mock articles
     article1 = MagicMock()
+    article1.id = article_id
     article1.topic = "Kỹ năng nấu ăn"
-    article1.md_content = "---\ntitle: Kỹ năng nấu ăn\n---\n# Content"
+    article1.md_content = "---\ntitle: Kỹ năng nấu ăn\nmeta_description: Demo\n---\n# Content\n\n<figure><img src=\"https://example.com/demo.png\" alt=\"Demo\" loading=\"lazy\"><figcaption>Demo</figcaption></figure>"
     article1.content = None
-    
-    article2 = MagicMock()
-    article2.topic = "Cách học Tiếng Anh"
-    article2.md_content = "---\ntitle: Cách học Tiếng Anh\n---\n# Content 2"
-    article2.content = None
-    
-    # Mock the database result
-    mock_scalars = MagicMock()
-    mock_scalars.all.return_value = [article1, article2]
-    
+    article1.images_json = [
+        {
+            "h2": "Demo",
+            "query": "Demo",
+            "image_url": "https://example.com/demo.png",
+            "alt": "Demo",
+            "caption": "Demo",
+            "rank": 3,
+            "engine": "bing",
+        }
+    ]
+
     mock_result = MagicMock()
-    mock_result.scalars.return_value = mock_scalars
-    
+    mock_result.scalar_one_or_none.return_value = article1
+
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
-    
-    # Call export
-    response = await export_articles(job_id=None, db=mock_db)
+
+    async def fake_download(image_url: str):
+        return b"image-bytes", "image/png"
+
+    with patch("app.routers.export._download_image_asset", side_effect=fake_download):
+        # Call export
+        response = await export_articles(article_id=article_id, job_id=None, db=mock_db)
     
     # Extract ZIP content
     zip_data = io.BytesIO()
@@ -189,6 +199,16 @@ async def test_export_zip_with_slugified_names() -> None:
     zip_data.seek(0)
     with zipfile.ZipFile(zip_data) as zf:
         names = zf.namelist()
-        # Should have slugified names
-        assert any("ky-nang-nau-an" in name for name in names)
-        assert any("cach-hoc-tieng-anh" in name for name in names)
+        folder = slugify(article1.topic, allow_unicode=False)[:80]
+        assert f"{folder}/article.md" in names
+        assert f"{folder}/index.html" in names
+        assert f"{folder}/images/" in names
+        assert f"{folder}/images/image-01.png" in names
+
+        md = zf.read(f"{folder}/article.md").decode("utf-8")
+        assert "images/image-01.png" in md
+        assert "https://example.com/demo.png" not in md
+
+        html = zf.read(f"{folder}/index.html").decode("utf-8")
+        assert "images/image-01.png" in html
+        assert "https://example.com/demo.png" not in html

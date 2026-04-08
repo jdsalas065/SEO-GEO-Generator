@@ -76,6 +76,16 @@ def test_validate_content_missing_h2():
     assert any("H2" in e for e in errors)
 
 
+def test_validate_content_accepts_conclusion_variants():
+    base = "# Title\n\nGiới thiệu đủ dài để kiểm tra.\n\n## Nội dung chính\n\n### Mục 1\n\nNội dung.\n\n### Mục 2\n\nNội dung.\n"
+    variants = ["## Kết bài", "## Tóm lại", "## Lời kết"]
+
+    for heading in variants:
+        content = f"{base}\n{heading}\n\nĐoạn kết ngắn."
+        errors = validate_content(content, rules=SAMPLE_RULES)
+        assert not any("Conclusion section appears missing" in e for e in errors)
+
+
 def test_save_markdown(tmp_path):
     content = "# Test\n\nContent here."
     out = save_markdown(content, tmp_path / "sub" / "test.md")

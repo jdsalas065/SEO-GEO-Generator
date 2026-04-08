@@ -1,10 +1,13 @@
 """Router: GET /articles and PATCH /articles/{id}/review."""
 from __future__ import annotations
 
+import io
 import uuid
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
+from slugify import slugify
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -33,6 +36,42 @@ async def list_articles(
     result = await db.execute(stmt)
     articles = result.scalars().all()
     return [ArticleOut.model_validate(a) for a in articles]
+
+
+@router.get("/{article_id}/download")
+async def download_article_markdown(
+    article_id: uuid.UUID,
+    source: Literal["auto", "content", "md_content"] = Query(
+        "auto",
+        description="Choose markdown source: auto (prefer md_content), content, or md_content",
+    ),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """Download a single article as .md from selected source content."""
+    result = await db.execute(select(Article).where(Article.id == article_id))
+    article = result.scalar_one_or_none()
+    if article is None:
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    if source == "content":
+        content = article.content or ""
+    elif source == "md_content":
+        content = article.md_content or ""
+    else:
+        content = article.md_content or article.content or ""
+
+    if not content.strip():
+        raise HTTPException(status_code=404, detail="Article content is empty")
+
+    topic_slug = slugify(article.topic, allow_unicode=False)[:80]
+    filename_stem = topic_slug or str(article.id)
+    filename = f"{filename_stem}.md"
+
+    return StreamingResponse(
+        io.BytesIO(content.encode("utf-8")),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.patch("/{article_id}/review", response_model=ArticleOut)

@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 import httpx
 
 from app.image_search import (
+    attach_images,
     extract_h2_headings,
     fetch_bing_image_url,
     head_content_type_check,
@@ -127,3 +128,29 @@ def test_fallback_selection_prefers_rank3_then_next_candidates(monkeypatch) -> N
     )
 
     assert url == "https://img.example.com/4.jpg"
+
+
+def test_attach_images_fallbacks_to_first_h2_when_no_keyword_matches(monkeypatch) -> None:
+    """When score-based selection yields none, fallback should still attach images to early H2s."""
+    md = """# Tieu de
+
+## Chu de A
+Noi dung A
+
+## Chu de B
+Noi dung B
+"""
+
+    monkeypatch.setattr("app.image_search.IMAGE_SEARCH_ENGINE", "bing")
+    monkeypatch.setattr("app.image_search.IMAGE_MAX_PER_ARTICLE", 2)
+    monkeypatch.setattr(
+        "app.image_search.fetch_bing_image_url",
+        lambda **kwargs: "https://img.example.com/a.jpg",
+    )
+
+    new_md, images = attach_images(md, topic="va va va", keyword=None, article_id="a1")
+
+    assert len(images) == 2
+    assert images[0]["h2"] == "Chu de A"
+    assert images[1]["h2"] == "Chu de B"
+    assert "<figure>" in new_md

@@ -58,3 +58,19 @@ def test_build_prompt_word_count_range():
     prompt = build_prompt("Topic", rules=SAMPLE_RULES)
     assert "800" in prompt
     assert "1500" in prompt
+
+
+def test_build_write_prompt_requires_conclusion():
+    from app.prompt_builder import build_write_prompt
+
+    outline = {
+        "h1": "Test H1",
+        "sections": [{"h2": "Section 1", "h3s": ["Sub 1"], "key_points": ["Point 1", "Point 2"]}],
+        "keywords": ["test"],
+        "faq": [{"q": "Q1?", "a": "A1"}],
+    }
+
+    prompt = build_write_prompt("Topic", outline, config=SAMPLE_RULES)
+
+    assert "## Kết luận" in prompt["user"]
+    assert "Do not omit the conclusion section" in prompt["user"]
