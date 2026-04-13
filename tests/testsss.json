@@ -1,3 +1,174 @@
 [
-  { "topic": "Vé máy bay đi Nhật Bản 2026: Giá vé, hãng bay và kinh nghiệm săn vé rẻ", "keyword": "vé máy bay đi nhật bản 2026" }
+  {
+    "topic": "Sân bay quốc tế Narita",
+    "keyword": "sân bay quốc tế Narita",
+    "outline": {
+      "Heading": "Sân bay quốc tế Narita: Sơ đồ, nhà ga, tiện ích và cách di chuyển",
+      "intro": "Mở bài ngắn gọn, dẫn dắt vào vai trò của Narita, nêu lý do sân bay này quan trọng với du khách đi Nhật. Có thể dùng PAS, FAB hoặc AIDA để tạo nhịp mở bài tự nhiên, súc tích.",
+      "sections": [
+        {
+          "level": "H2",
+          "title": "Giới thiệu chung về sân bay quốc tế Narita",
+          "subsections": [
+            {
+              "level": "H3",
+              "title": "Tổng quan sân bay Narita",
+              "notes": "Vị trí, vai trò trung tâm của các hãng bay, tình hình đón khách hiện nay."
+            },
+            {
+              "level": "H3",
+              "title": "Lịch sử hình thành sân bay Narita",
+              "notes": "Giới thiệu ngắn gọn về quá trình xây dựng, khởi công, hoàn thành và các mốc đáng chú ý."
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "title": "Sơ đồ, cấu trúc cơ sở hạ tầng của sân bay Narita",
+          "subsections": [
+            {
+              "level": "H3",
+              "title": "Hệ thống sân đỗ máy bay",
+              "notes": "Vị trí sân đỗ, số lượng máy bay, loại máy bay khai thác."
+            },
+            {
+              "level": "H3",
+              "title": "Hệ thống đường băng",
+              "notes": "Tóm tắt vị trí và chiều dài các đường băng."
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "title": "Nhà ga sân bay Narita",
+          "subsections": [
+            {
+              "level": "H3",
+              "title": "Nhà ga nội địa",
+              "notes": "Số lượng nhà ga nội địa, chặng bay, số cổng bay."
+            },
+            {
+              "level": "H3",
+              "title": "Nhà ga quốc tế",
+              "notes": "Giới thiệu khái quát nhà ga quốc tế và các khác biệt nổi bật."
+            }
+          ],
+          "h4_notes": [
+            "Mỗi nhà ga có thể triển khai thành một H4 riêng với diện tích, tiện nghi, cổng lên máy bay, cổng xe buýt, hãng hàng không thuê và điểm thú vị.",
+            "Nếu số lượng nhà ga thay đổi theo thực tế, có thể điều chỉnh số H4 tương ứng mà không cần bám cứng vào số lượng cố định."
+          ]
+        },
+        {
+          "level": "H2",
+          "title": "Các dịch vụ tiện ích sân bay Narita",
+          "subsections": [
+            {
+              "level": "H3",
+              "title": "Dịch vụ di chuyển giữa các nhà ga",
+              "notes": "Xe bus, xe đưa đón, khu đi bộ, cầu đi bộ kết nối, chi phí, v.v."
+            },
+            {
+              "level": "H3",
+              "title": "Phòng chờ sân bay Narita",
+              "notes": "Thiết kế, nội thất, dịch vụ của từng phòng chờ; có thể mở rộng thành H4 cho từng lounge."
+            },
+            {
+              "level": "H3",
+              "title": "Khách sạn trong sân bay",
+              "notes": "Thiết kế, dịch vụ tiện ích, giá phòng."
+            },
+            {
+              "level": "H3",
+              "title": "Khách sạn gần sân bay",
+              "notes": "Thiết kế, dịch vụ tiện ích, giá phòng, khoảng cách tới sân bay."
+            },
+            {
+              "level": "H3",
+              "title": "Mua sắm tại sân bay",
+              "notes": "Cửa hàng miễn thuế, thực phẩm, lưu niệm, thời trang, mẹo mua hàng miễn thuế."
+            },
+            {
+              "level": "H3",
+              "title": "Nhà hàng tại sân bay",
+              "notes": "Danh sách nhà hàng, món ăn nổi bật, trải nghiệm ẩm thực."
+            },
+            {
+              "level": "H3",
+              "title": "Dịch vụ gia đình",
+              "notes": "Khu vui chơi trẻ em, nhà vệ sinh gia đình, điều dưỡng, tiện ích cho gia đình."
+            },
+            {
+              "level": "H3",
+              "title": "Những dịch vụ tiện ích khác",
+              "notes": "Wifi, hỗ trợ người khuyết tật, phòng cầu nguyện, sạc điện thoại, quấn hành lý, đổi tiền, mua sim."
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "title": "Phương tiện di chuyển từ sân bay Narita vào trung tâm thành phố",
+          "subsections": [
+            {
+              "level": "H3",
+              "title": "Xe bus",
+              "notes": "Tuyến xe, tần suất chạy, chi phí."
+            },
+            {
+              "level": "H3",
+              "title": "Taxi",
+              "notes": "Hãng taxi, giá mở cửa, vị trí đón xe."
+            },
+            {
+              "level": "H3",
+              "title": "Tàu cao tốc",
+              "notes": "Giới thiệu chung, giá vé, thời gian di chuyển."
+            },
+            {
+              "level": "H3",
+              "title": "Xe đưa đón của khách sạn",
+              "notes": "Nếu có, nêu cách nhận biết, cách đón, chi phí."
+            },
+            {
+              "level": "H3",
+              "title": "Xe tự lái của sân bay",
+              "notes": "Dịch vụ xe tự lái, chi phí, vị trí lấy xe."
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "title": "Sự thật thú vị về sân bay Narita",
+          "subsections": [
+            {
+              "level": "H3",
+              "title": "Những điểm đặc biệt ít người biết",
+              "notes": "Danh sách sự thật thú vị, điểm độc đáo, chi tiết khác biệt của sân bay."
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "title": "Bảng vé máy bay từ VN đến sân bay Narita",
+          "subsections": [
+            {
+              "level": "H3",
+              "title": "Bảng giá vé tham khảo",
+              "notes": "Các cột: Hành trình bay, hãng bay, giá vé một chiều, thời gian bay."
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "title": "Kết bài",
+          "subsections": [
+            {
+              "level": "H3",
+              "title": "Tóm lược và kêu gọi hành động",
+              "notes": "Tóm gọn ý chính, nhắc lại điểm nổi bật và kêu gọi hành động/quảng bá thương hiệu."
+            }
+          ]
+        }
+      ]
+    }
+  }
 ]

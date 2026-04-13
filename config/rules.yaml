@@ -41,6 +41,15 @@ seo:
   keyword_density_max: 0.03      # 3%
 
 geo:
+  eeat_level: basic           # basic | ymyl (YMYL = y tế, tài chính, pháp lý)
+  snippet_position: top       # đoạn GEO snippet đặt đầu bài
+  reader_awareness: true      # bật detect tầng nhận thức trong outline
+  geo_principles:
+    - answer_first            # trả lời thẳng trước, giải thích sau
+    - real_examples           # ví dụ thật, case study thật
+    - semantic_over_keyword   # tối ưu ngữ nghĩa, không nhồi từ khoá
+    - entity_building         # đề cập thương hiệu/tác giả rõ ràng
+    - short_paragraphs        # đoạn 2–4 câu, tránh tường chữ
   target_country: VN
   locale: vi-VN
   local_entities: true           # include local business / place names when relevant

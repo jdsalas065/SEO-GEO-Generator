@@ -64,6 +64,10 @@ class Article(Base):
     )
     topic: Mapped[str] = mapped_column(String(512), nullable=False)
     keyword: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    outline: Mapped[Any | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"),
+        nullable=True,
+    )
     status: Mapped[ArticleStatus] = mapped_column(
         Enum(ArticleStatus, name="article_status"),
         nullable=False,

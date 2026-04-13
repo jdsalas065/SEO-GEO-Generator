@@ -113,6 +113,7 @@ async def review_article(
             job_id=str(article.job_id),
             topic=article.topic,
             keyword=article.keyword,
+            outline=article.outline,
             review_note=body.note,
         )
 
@@ -161,6 +162,7 @@ async def retry_article(
         job_id=str(article.job_id),
         topic=article.topic,
         keyword=article.keyword,
+        outline=article.outline,
         review_note=payload.note or article.review_note,
     )
 

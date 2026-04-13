@@ -152,12 +152,14 @@ class TestPromptBuilders:
     def test_build_outline_prompt(self) -> None:
         """Test outline prompt structure."""
         topic = "Kỹ năng nấu ăn"
-        prompt = build_outline_prompt(topic)
+        prompt = build_outline_prompt(topic, keyword="nấu ăn", reference_outline={"H2": ["Giới thiệu"]})
         
         assert "system" in prompt
         assert "user" in prompt
         assert "JSON" in prompt["user"]
         assert topic in prompt["user"]
+        assert "nấu ăn" in prompt["user"]
+        assert "Reference input" in prompt["user"]
 
     def test_build_outline_prompt_with_review_note(self) -> None:
         """Test outline prompt includes review note."""
@@ -205,24 +207,27 @@ class TestPromptBuilders:
             "keywords": ["nấu ăn", "kỹ năng"],
             "faq": [{"q": "Khi nào cần gia vị?", "a": "Tùy vào món ăn"}],
         }
-        prompt = build_write_prompt(topic, outline)
+        prompt = build_write_prompt(topic, outline, keyword="nấu ăn", reference_outline={"H2": ["Giới thiệu"]})
         
         assert "system" in prompt
         assert "user" in prompt
         assert topic in prompt["user"]
         assert "Chuẩn bị" in prompt["user"]
+        assert "Reference outline" in prompt["user"]
+        assert "nấu ăn" in prompt["user"]
 
     def test_build_seo_check_prompt(self) -> None:
         """Test SEO check prompt structure."""
         topic = "Kỹ năng nấu ăn"
         article = "# Kỹ năng nấu ăn\n\nĐây là bài viết về nấu ăn."
-        prompt = build_seo_check_prompt(topic, article)
+        prompt = build_seo_check_prompt(topic, article, reader_stage="deciding")
         
         assert "system" in prompt
         assert "user" in prompt
         assert "JSON" in prompt["user"]
         assert "meta_description" in prompt["user"]
         assert "geo_score" in prompt["user"]
+        assert "final objections" in prompt["user"].lower()
 
 
 class TestMultiStepPipelineIntegration:
@@ -239,7 +244,7 @@ class TestMultiStepPipelineIntegration:
         }
         
         # Should not raise
-        write_prompt = build_write_prompt(topic, outline)
+        write_prompt = build_write_prompt(topic, outline, keyword="test kw")
         assert write_prompt is not None
         assert "Test Title" in write_prompt["user"]
 

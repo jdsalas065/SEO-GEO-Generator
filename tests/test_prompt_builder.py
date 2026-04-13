@@ -1,7 +1,12 @@
 """Tests for prompt_builder module."""
 from __future__ import annotations
 
-from app.prompt_builder import build_prompt
+from app.prompt_builder import (
+    build_fallback_outline,
+    build_outline_prompt,
+    build_prompt,
+    build_write_prompt,
+)
 
 
 SAMPLE_RULES = {
@@ -12,8 +17,19 @@ SAMPLE_RULES = {
         "language": "vi",
     },
     "geo": {
+        "eeat_level": "basic",
+        "snippet_position": "top",
+        "reader_awareness": True,
+        "geo_principles": [
+            "answer_first",
+            "real_examples",
+            "semantic_over_keyword",
+            "entity_building",
+            "short_paragraphs",
+        ],
         "target_country": "VN",
         "locale": "vi-VN",
+        "local_entities": True,
     },
     "content": {
         "include_faq": True,
@@ -30,6 +46,13 @@ def test_build_prompt_contains_topic():
 def test_build_prompt_contains_keyword():
     prompt = build_prompt("Test topic", keyword="test kw", rules=SAMPLE_RULES)
     assert "test kw" in prompt
+
+
+def test_build_prompt_contains_geo_guidance():
+    prompt = build_prompt("Test topic", rules=SAMPLE_RULES)
+    assert "answer_first" in prompt.lower()
+    assert "semantic_over_keyword" in prompt.lower()
+    assert "reader_awareness" in prompt.lower()
 
 
 def test_build_prompt_no_keyword_no_keyword_line():
@@ -61,16 +84,61 @@ def test_build_prompt_word_count_range():
 
 
 def test_build_write_prompt_requires_conclusion():
-    from app.prompt_builder import build_write_prompt
-
     outline = {
         "h1": "Test H1",
+        "search_intent": "informational",
+        "reader_stage": "considering",
         "sections": [{"h2": "Section 1", "h3s": ["Sub 1"], "key_points": ["Point 1", "Point 2"]}],
         "keywords": ["test"],
         "faq": [{"q": "Q1?", "a": "A1"}],
     }
 
-    prompt = build_write_prompt("Topic", outline, config=SAMPLE_RULES)
+    prompt = build_write_prompt("Topic", outline, config=SAMPLE_RULES, review_note="Cần thêm ví dụ thật")
 
     assert "## Kết luận" in prompt["user"]
-    assert "Do not omit the conclusion section" in prompt["user"]
+    assert "Treat the structure below as the primary guide" in prompt["user"]
+    assert "Cần thêm ví dụ thật" in prompt["user"]
+    assert "answer_first" in prompt["user"].lower()
+    assert "reader stage (considering)" in prompt["user"].lower()
+    assert "search intent: informational" in prompt["user"].lower()
+
+
+def test_build_write_prompt_includes_keyword_and_reference_outline():
+    outline = {
+        "h1": "Test H1",
+        "search_intent": "informational",
+        "reader_stage": "curious",
+        "sections": [{"h2": "Section 1", "h3s": [], "key_points": ["Point 1", "Point 2"]}],
+        "keywords": ["test"],
+        "faq": [],
+    }
+    prompt = build_write_prompt(
+        "Topic",
+        outline,
+        config=SAMPLE_RULES,
+        keyword="vé máy bay đi nhật bản 2026",
+        reference_outline={"H2": ["Giới thiệu điểm đến"]},
+    )
+
+    assert "vé máy bay đi nhật bản 2026" in prompt["user"]
+    assert "Reference outline" in prompt["user"]
+    assert "do not copy verbatim" in prompt["user"].lower()
+
+
+def test_build_outline_prompt_has_reader_fields():
+    prompt = build_outline_prompt(
+        "Kỹ năng nấu ăn",
+        config=SAMPLE_RULES,
+        keyword="học nấu ăn",
+        reference_outline={"H2": ["Giới thiệu"]},
+    )
+    assert "search_intent" in prompt["user"]
+    assert "reader_stage" in prompt["user"]
+    assert "học nấu ăn" in prompt["user"]
+    assert "Reference input" in prompt["user"]
+
+
+def test_build_fallback_outline_has_reader_fields():
+    outline = build_fallback_outline("Máy lọc không khí", config=SAMPLE_RULES)
+    assert outline["search_intent"] == "informational"
+    assert outline["reader_stage"] == "curious"

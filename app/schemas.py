@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -133,6 +133,7 @@ class ArticleOut(BaseModel):
     job_id: uuid.UUID
     topic: str
     keyword: Optional[str]
+    outline: Optional[Any]
     status: ArticleStatus
     current_step: Optional[str]
     content: Optional[str]

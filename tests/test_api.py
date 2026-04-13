@@ -11,6 +11,7 @@ import openpyxl
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy.future import select
 
 from app.models import Article, ArticleStatus, Job, JobStatus
 from app.post_processor import build_markdown_with_frontmatter
@@ -52,8 +53,8 @@ async def test_health(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_create_job_json(client: AsyncClient, mocker):
-    mocker.patch("app.routers.jobs.generate_article.delay")
-    payload = [{"topic": "Ẩm thực Việt Nam", "keyword": "ẩm thực"}]
+    delay_mock = mocker.patch("app.routers.jobs.generate_article.delay")
+    payload = [{"topic": "Ẩm thực Việt Nam", "keyword": "ẩm thực", "outline": {"H2": ["Giới thiệu"]}}]
     resp = await client.post(
         "/jobs",
         files={"file": ("topics.json", io.BytesIO(make_json_bytes(payload)), "application/json")},
@@ -62,13 +63,30 @@ async def test_create_job_json(client: AsyncClient, mocker):
     data = resp.json()
     assert data["total"] == 1
     assert data["status"] == "running"
+    assert delay_mock.call_count == 1
+    assert delay_mock.call_args.kwargs["keyword"] == "ẩm thực"
+    assert delay_mock.call_args.kwargs["outline"] == {"H2": ["Giới thiệu"]}
+
+
+@pytest.mark.asyncio
+async def test_create_job_json_topic_only_still_works(client: AsyncClient, mocker):
+    delay_mock = mocker.patch("app.routers.jobs.generate_article.delay")
+    payload = [{"topic": "Chỉ có tiêu đề bài viết"}]
+    resp = await client.post(
+        "/jobs",
+        files={"file": ("topics.json", io.BytesIO(make_json_bytes(payload)), "application/json")},
+    )
+    assert resp.status_code == 201
+    assert delay_mock.call_count == 1
+    assert delay_mock.call_args.kwargs["keyword"] is None
+    assert delay_mock.call_args.kwargs["outline"] is None
 
 
 @pytest.mark.asyncio
 async def test_create_job_xlsx(client: AsyncClient, mocker):
-    mocker.patch("app.routers.jobs.generate_article.delay")
+    delay_mock = mocker.patch("app.routers.jobs.generate_article.delay")
     rows = [
-        {"topic": "Du lịch Đà Nẵng", "keyword": "du lịch"},
+        {"topic": "Du lịch Đà Nẵng", "keyword": "du lịch", "outline": json.dumps({"H2": ["Giới thiệu"]}, ensure_ascii=False)},
         {"topic": "Học lập trình Python"},
     ]
     xlsx_bytes = make_xlsx_bytes(rows)
@@ -85,6 +103,7 @@ async def test_create_job_xlsx(client: AsyncClient, mocker):
     assert resp.status_code == 201
     data = resp.json()
     assert data["total"] == 2
+    assert delay_mock.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -114,12 +133,18 @@ async def test_get_job_not_found(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_job(client: AsyncClient, mocker, db_session):
     mocker.patch("app.routers.jobs.generate_article.delay")
-    payload = [{"topic": "Test topic"}]
+    payload = [{"topic": "Test topic", "outline": {"H2": ["Intro"]}}]
     resp = await client.post(
         "/jobs",
         files={"file": ("t.json", io.BytesIO(make_json_bytes(payload)), "application/json")},
     )
     job_id = resp.json()["id"]
+
+    article = (
+        await db_session.execute(select(Article).where(Article.job_id == uuid.UUID(job_id)))
+    ).scalars().first()
+    assert article is not None
+    assert article.outline == {"H2": ["Intro"]}
 
     resp2 = await client.get(f"/jobs/{job_id}")
     assert resp2.status_code == 200

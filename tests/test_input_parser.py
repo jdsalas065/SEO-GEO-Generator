@@ -50,6 +50,16 @@ def test_parse_excel_no_keyword(tmp_dir):
     assert result[0]["keyword"] is None
 
 
+def test_parse_excel_outline_json_string(tmp_dir):
+    outline = {"Heading": "OUTLINE VÉ MÁY BAY TỪ HÀ NỘI ĐI MỸ", "H2": ["Giới thiệu"]}
+    xlsx = make_xlsx(
+        tmp_dir / "topics.xlsx",
+        [{"topic": "Vé máy bay đi Mỹ", "outline": json.dumps(outline, ensure_ascii=False)}],
+    )
+    result = parse_excel(xlsx)
+    assert result[0]["outline"] == outline
+
+
 def test_parse_excel_empty(tmp_dir):
     wb = openpyxl.Workbook()
     wb.active.title = "Sheet1"
@@ -69,6 +79,15 @@ def test_parse_json_list(tmp_dir):
     result = parse_json(path)
     assert len(result) == 2
     assert result[1]["keyword"] is None
+
+
+def test_parse_json_with_outline_object(tmp_dir):
+    outline = {"Heading": "OUTLINE", "H2": ["Giới thiệu"]}
+    data = [{"topic": "Vé máy bay đi Mỹ", "keyword": "vé máy bay", "outline": outline}]
+    path = tmp_dir / "topics.json"
+    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    result = parse_json(path)
+    assert result[0]["outline"] == outline
 
 
 def test_parse_json_envelope(tmp_dir):

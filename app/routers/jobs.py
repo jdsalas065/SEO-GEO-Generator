@@ -89,6 +89,7 @@ async def create_job(
                 job_id=job.id,
                 topic=item["topic"],
                 keyword=item.get("keyword"),
+                outline=item.get("outline"),
                 status=ArticleStatus.queued,
             )
             db.add(article)
@@ -99,6 +100,7 @@ async def create_job(
                 job_id=str(job.id),
                 topic=item["topic"],
                 keyword=item.get("keyword"),
+                outline=item.get("outline"),
             )
 
         await db.commit()

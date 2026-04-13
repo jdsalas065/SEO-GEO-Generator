@@ -6,6 +6,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
+from typing import Any
 
 from celery import Celery
 from celery.exceptions import SoftTimeLimitExceeded, TimeLimitExceeded
@@ -145,6 +146,7 @@ def generate_article(
     job_id: str,
     topic: str,
     keyword: str | None = None,
+    outline: Any | None = None,
     review_note: str | None = None,
 ) -> dict:
     """
@@ -163,6 +165,7 @@ def generate_article(
         config = load_prompt_rules()
         llm_config = config.get("llm", {})
         steps_config = llm_config.get("steps", {})
+        reference_outline = outline
         
         # Mark as generating
         _run_async(
@@ -183,17 +186,23 @@ def generate_article(
         
         outline_cfg = steps_config.get("outline", {})
         outline_client = LLMClient.from_step_config(outline_cfg)
-        outline_prompt = build_outline_prompt(topic, config, review_note or "")
+        outline_prompt = build_outline_prompt(
+            topic,
+            config,
+            review_note or "",
+            keyword=keyword,
+            reference_outline=reference_outline,
+        )
         
         try:
-            outline = outline_client.generate_json(outline_prompt, max_retries=2)
+            generated_outline = outline_client.generate_json(outline_prompt, max_retries=2)
         except LLMJsonParseError as e:
             logger.warning(
                 "Article %s: Outline JSON parse failed (%s). Falling back to deterministic outline.",
                 article_id,
                 e,
             )
-            outline = build_fallback_outline(topic, config)
+            generated_outline = build_fallback_outline(topic, config)
 
         logger.info("Article %s: Step 1 (outline) completed", article_id)
 
@@ -207,7 +216,14 @@ def generate_article(
         
         write_cfg = steps_config.get("write", {})
         write_client = LLMClient.from_step_config(write_cfg)
-        write_prompt = build_write_prompt(topic, outline, config)
+        write_prompt = build_write_prompt(
+            topic,
+            generated_outline,
+            config,
+            review_note=review_note,
+            keyword=keyword,
+            reference_outline=reference_outline,
+        )
         
         article_md = write_client.generate(write_prompt)
         
@@ -239,7 +255,12 @@ def generate_article(
         
         seo_cfg = steps_config.get("seo_check", {})
         seo_client = LLMClient.from_step_config(seo_cfg)
-        seo_prompt = build_seo_check_prompt(topic, article_md, config)
+        seo_prompt = build_seo_check_prompt(
+            topic,
+            article_md,
+            config,
+            reader_stage=generated_outline.get("reader_stage"),
+        )
         
         try:
             seo_result = seo_client.generate_json(seo_prompt)
